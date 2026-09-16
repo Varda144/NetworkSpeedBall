@@ -47,6 +47,12 @@ class FloatingSpeedService : Service() {
         scheduleNextUpdate()
     }
 
+    private fun sampleTraffic() {
+        lastRx = TrafficStats.getTotalRxBytes()
+        lastTx = TrafficStats.getTotalTxBytes()
+        lastElapsedMs = SystemClock.elapsedRealtime()
+    }
+
     private fun startForegroundNotification() {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
