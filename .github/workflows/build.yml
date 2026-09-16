@@ -54,6 +54,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Generate Gradle Wrapper
+        run: |
+          curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.5-bin.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          /tmp/gradle-8.5/bin/gradle wrapper --gradle-version 8.5
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
