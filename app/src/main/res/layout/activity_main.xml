@@ -160,7 +160,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Requires "Display over other apps" permission"
+            android:text='Requires "Display over other apps" permission'
             android:textSize="12sp"
             android:textColor="#475569"
             android:gravity="center"
