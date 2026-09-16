@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Network Speed Ball</string>
+    <string name="floating_ball_desc">Floating network speed indicator. Double tap to minimize, drag to move.</string>
+    <string name="permission_rationale">This app needs permission to display a floating ball showing your live network speed over other apps.</string>
+    <string name="start_service">Start Floating Ball</string>
+    <string name="stop_service">Stop Floating Ball</string>
+    <string name="grant_permission">Grant Overlay Permission</string>
+    <string name="permission_granted">Permission Granted</string>
+    <string name="download_speed">Download speed</string>
+    <string name="upload_speed">Upload speed</string>
+    <string name="ping_time">Ping time</string>
+</resources>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/ball_background"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="12dp"
+    android:minWidth="120dp"
+    android:minHeight="72dp"
+    android:focusable="true"
+    android:clickable="true"
+    android:contentDescription="@string/floating_ball_desc">
+
+    <TextView
+        android:id="@+id/tvDownload"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="↓ 0.0 KB/s"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#22C55E"
+        android:fontFamily="@font/jetbrains_mono"
+        android:shadowColor="#22C55E"
+        android:shadowRadius="4"
+        android:shadowDx="0"
+        android:shadowDy="0"
+        android:includeFontPadding="false"
+        android:lineHeight="24sp"
+        android:contentDescription="Download speed"/>
+
+    <TextView
+        android:id="@+id/tvUpload"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="↑ 0.0 KB/s"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#00AAFF"
+        android:fontFamily="@font/jetbrains_mono"
+        android:shadowColor="#00AAFF"
+        android:shadowRadius="3"
+        android:shadowDx="0"
+        android:shadowDy="0"
+        android:includeFontPadding="false"
+        android:lineHeight="20sp"
+        android:contentDescription="Upload speed"/>
+
+    <TextView
+        android:id="@+id/tvPing"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ping: -- ms"
+        android:textSize="11sp"
+        android:textColor="#FFAA00"
+        android:layout_marginTop="2dp"
+        android:contentDescription="Ping time"/>
+
+</LinearLayout>
