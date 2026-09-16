@@ -20,14 +20,13 @@
         android:textSize="18sp"
         android:textStyle="bold"
         android:textColor="#22C55E"
-        android:fontFamily="@font/jetbrains_mono"
+        android:fontFamily="monospace"
         android:shadowColor="#22C55E"
         android:shadowRadius="4"
         android:shadowDx="0"
         android:shadowDy="0"
         android:includeFontPadding="false"
-        android:lineHeight="24sp"
-        android:contentDescription="Download speed"/>
+        android:contentDescription="@string/download_speed"/>
 
     <TextView
         android:id="@+id/tvUpload"
@@ -37,14 +36,13 @@
         android:textSize="14sp"
         android:textStyle="bold"
         android:textColor="#00AAFF"
-        android:fontFamily="@font/jetbrains_mono"
+        android:fontFamily="monospace"
         android:shadowColor="#00AAFF"
         android:shadowRadius="3"
         android:shadowDx="0"
         android:shadowDy="0"
         android:includeFontPadding="false"
-        android:lineHeight="20sp"
-        android:contentDescription="Upload speed"/>
+        android:contentDescription="@string/upload_speed"/>
 
     <TextView
         android:id="@+id/tvPing"
@@ -54,6 +52,6 @@
         android:textSize="11sp"
         android:textColor="#FFAA00"
         android:layout_marginTop="2dp"
-        android:contentDescription="Ping time"/>
+        android:contentDescription="@string/ping_time"/>
 
 </LinearLayout>

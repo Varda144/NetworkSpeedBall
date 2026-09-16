@@ -1,39 +1,69 @@
 package com.example.networkspeedball
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.net.TrafficStats
+import android.os.Build
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
-import android.widget.Toast
-import java.net.URL
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import androidx.core.app.NotificationCompat
 
 class FloatingSpeedService : Service() {
 
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val executor = Executors.newSingleThreadExecutor()
     private var isRunning = false
     private var minimized = false
-    private var lastTouchX = 0f
-    private var lastTouchY = 0f
+    private var lastTouchRawX = 0f
+    private var lastTouchRawY = 0f
     private var initialX = 0
     private var initialY = 0
+    private var moved = false
+
+    private var lastRx = 0L
+    private var lastTx = 0L
+    private var lastElapsedMs = 0L
 
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        startForegroundNotification()
         createFloatingView()
-        startSpeedUpdates()
+        sampleTraffic()
+        isRunning = true
+        scheduleNextUpdate()
+    }
+
+    private fun startForegroundNotification() {
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(CHANNEL_ID, "Speed ball", NotificationManager.IMPORTANCE_MIN)
+            manager.createNotificationChannel(channel)
+        }
+        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(R.string.floating_ball_desc))
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setOngoing(true)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun createFloatingView() {
@@ -42,156 +72,107 @@ class FloatingSpeedService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         )
         params.gravity = Gravity.TOP or Gravity.END
-        params.x = resources.getDimensionPixelSize(android.R.dimen.app_icon_size)
+        params.x = 20
         params.y = 200
 
         floatingView = LayoutInflater.from(this).inflate(R.layout.floating_ball, null)
         windowManager.addView(floatingView, params)
 
-        setupTouchListener()
-        setupAccessibility()
-    }
-
-    private fun setupTouchListener() {
         floatingView?.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    lastTouchX = event.rawX
-                    lastTouchY = event.rawY
-                    initialX = floatingView?.let { (it.parent as WindowManager.LayoutParams).x } ?: 0
-                    initialY = floatingView?.let { (it.parent as WindowManager.LayoutParams).y } ?: 0
-                    floatingView?.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    lastTouchRawX = event.rawX
+                    lastTouchRawY = event.rawY
+                    moved = false
+                    val lp = floatingView?.layoutParams as? WindowManager.LayoutParams
+                    initialX = lp?.x ?: 0
+                    initialY = lp?.y ?: 0
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = (event.rawX - lastTouchX).toInt()
-                    val dy = (event.rawY - lastTouchY).toInt()
-                    updatePosition(initialX + dx, initialY + dy)
+                    val dx = (event.rawX - lastTouchRawX).toInt()
+                    val dy = (event.rawY - lastTouchRawY).toInt()
+                    if (Math.abs(dx) > TOUCH_SLOP || Math.abs(dy) > TOUCH_SLOP) {
+                        moved = true
+                        updatePosition(initialX - dx, initialY + dy)
+                    }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    val dx = Math.abs(event.rawX - lastTouchX)
-                    val dy = Math.abs(event.rawY - lastTouchY)
-                    if (dx < 16 && dy < 16) {
+                    if (!moved) {
                         toggleMinimize()
-                        floatingView?.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                     }
                     true
                 }
                 else -> false
             }
         }
-    }
-
-    private fun setupAccessibility() {
-        floatingView?.contentDescription = getString(R.string.floating_ball_desc)
-        floatingView?.setOnClickListener {
-            // Click alternative for users who can't drag
-            // Could show a small menu or just minimize
-        }
         floatingView?.setOnLongClickListener {
-            // Long press to show move handles or menu
-            showMoveOptions()
+            stopSelf()
             true
         }
     }
 
-    private fun showMoveOptions() {
-        // Alternative to drag: tap corners to move
-        Toast.makeText(this, "Drag to move, tap to minimize", Toast.LENGTH_SHORT).show()
-    }
-
     private fun updatePosition(x: Int, y: Int) {
-        val params = floatingView?.layoutParams as? WindowManager.LayoutParams
-        params?.x = x
-        params?.y = y
-        params?.let { windowManager.updateViewLayout(floatingView!!, it) }
+        val lp = floatingView?.layoutParams as? WindowManager.LayoutParams ?: return
+        lp.x = x
+        lp.y = y
+        windowManager.updateViewLayout(floatingView, lp)
     }
 
     private fun toggleMinimize() {
         minimized = !minimized
-        val dlText = floatingView?.findViewById<TextView>(R.id.tvDownload)
-        val ulText = floatingView?.findViewById<TextView>(R.id.tvUpload)
-        val pingText = floatingView?.findViewById<TextView>(R.id.tvPing)
-
+        val dl = floatingView?.findViewById<View>(R.id.tvDownload)
+        val ul = floatingView?.findViewById<View>(R.id.tvUpload)
+        val ping = floatingView?.findViewById<View>(R.id.tvPing)
         if (minimized) {
-            ulText?.visibility = View.GONE
-            pingText?.visibility = View.GONE
-            dlText?.textSize = 14f
+            ul?.visibility = View.GONE
+            ping?.visibility = View.GONE
+            dl?.scaleX = 0.7f
+            dl?.scaleY = 0.7f
         } else {
-            ulText?.visibility = View.VISIBLE
-            pingText?.visibility = View.VISIBLE
-            dlText?.textSize = 18f
+            ul?.visibility = View.VISIBLE
+            ping?.visibility = View.VISIBLE
+            dl?.scaleX = 1f
+            dl?.scaleY = 1f
         }
-    }
-
-    private fun startSpeedUpdates() {
-        isRunning = true
-        scheduleNextUpdate()
     }
 
     private fun scheduleNextUpdate() {
         handler.postDelayed({
-            if (isRunning) {
-                executor.execute { measureSpeed() }
-                scheduleNextUpdate()
-            }
-        }, 2000)
-    }
-
-    private fun measureSpeed() {
-        try {
-            val url = URL("https://speed.hetzner.de/100MB.bin")
-            val connection = url.openConnection()
-            connection.setRequestProperty("Range", "bytes=0-524287")
-            connection.connectTimeout = 8000
-            connection.readTimeout = 8000
-
-            val start = System.currentTimeMillis()
-            val inputStream = connection.getInputStream()
-            val buffer = ByteArray(8192)
-            var totalRead = 0L
-            while (true) {
-                val read = inputStream.read(buffer)
-                if (read == -1) break
-                totalRead += read
-            }
-            inputStream.close()
-            val elapsed = (System.currentTimeMillis() - start) / 1000.0
-
-            if (elapsed > 0) {
-                val speedBps = totalRead / elapsed
-                val pingMs = elapsed * 1000
-                handler.post {
-                    updateDisplay(speedBps, pingMs)
+            if (!isRunning) return@postDelayed
+            val now = SystemClock.elapsedRealtime()
+            val rx = TrafficStats.getTotalRxBytes()
+            val tx = TrafficStats.getTotalTxBytes()
+            val deltaMs = now - lastElapsedMs
+            if (deltaMs > 0 && lastElapsedMs != 0L) {
+                val rxDelta = rx - lastRx
+                val txDelta = tx - lastTx
+                if (rxDelta >= 0 && txDelta >= 0) {
+                    updateDisplay(rxDelta * 1000.0 / deltaMs, txDelta * 1000.0 / deltaMs)
                 }
             }
-        } catch (e: Exception) {
-            handler.post { updateDisplay(0.0, 0.0) }
-        }
+            lastRx = rx
+            lastTx = tx
+            lastElapsedMs = now
+            scheduleNextUpdate()
+        }, UPDATE_INTERVAL_MS)
     }
 
-    private fun updateDisplay(speedBps: Double, pingMs: Double) {
-        val dlText = floatingView?.findViewById<TextView>(R.id.tvDownload)
-        val ulText = floatingView?.findViewById<TextView>(R.id.tvUpload)
-        val pingText = floatingView?.findViewById<TextView>(R.id.tvPing)
-
-        val dlStr = formatSpeed(speedBps)
-        val ulStr = formatSpeed(speedBps * 0.15) // estimate upload as ~15% of download
-
-        dlText?.text = "↓ $dlStr"
-        ulText?.text = "↑ $ulStr"
-        pingText?.text = if (pingMs > 0) "Ping: ${pingMs.toInt()} ms" else "Ping: -- ms"
+    private fun updateDisplay(rxBps: Double, txBps: Double) {
+        val dl = floatingView?.findViewById<TextView>(R.id.tvDownload)
+        val ul = floatingView?.findViewById<TextView>(R.id.tvUpload)
+        dl?.text = "↓ " + formatSpeed(rxBps)
+        ul?.text = "↑ " + formatSpeed(txBps)
     }
 
     private fun formatSpeed(bps: Double): String {
         return when {
+            bps < 0 || TrafficStats.UNSUPPORTED.toLong() == bps.toLong() -> "--"
             bps < 1024 -> String.format("%.1f B/s", bps)
             bps < 1024 * 1024 -> String.format("%.1f KB/s", bps / 1024)
             bps < 1024 * 1024 * 1024 -> String.format("%.1f MB/s", bps / (1024 * 1024))
@@ -202,15 +183,17 @@ class FloatingSpeedService : Service() {
     override fun onDestroy() {
         isRunning = false
         handler.removeCallbacksAndMessages(null)
-        executor.shutdown()
-        try {
-            executor.awaitTermination(1, TimeUnit.SECONDS)
-        } catch (e: InterruptedException) {
-            Thread.currentThread().interrupt()
-        }
         floatingView?.let { windowManager.removeView(it) }
+        floatingView = null
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        private const val CHANNEL_ID = "speed_ball_channel"
+        private const val NOTIFICATION_ID = 1001
+        private const val UPDATE_INTERVAL_MS = 1000L
+        private const val TOUCH_SLOP = 12
+    }
 }
